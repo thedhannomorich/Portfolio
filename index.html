@@ -271,7 +271,7 @@
       width: 58px;
       height: 58px;
       border-radius: 15px;
-      object-fit: fill;
+      object-fit: contain;
       background: #222;
     }
 
@@ -371,8 +371,8 @@
 
     .post-images img {
       width: 100%;
-      max-height: 580px;
-      object-fit: cover;
+      max-height: 350px;
+      object-fit: contain;
       display: block;
       background: #111;
     }
@@ -749,21 +749,25 @@
     orderBy
   } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAN0S2paboRcSV0iOFk1yrmPbrp1JA5P80",
-  authDomain: "akashduttaportfolio.firebaseapp.com",
-  projectId: "akashduttaportfolio",
-  storageBucket: "akashduttaportfolio.firebasestorage.app",
-  messagingSenderId: "544949853074",
-  appId: "1:544949853074:web:668290776787db7d7cbf4b"
-};
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({
+    prompt: "select_account"
+  });
+
   const db = getFirestore(app);
 
-  const PROFILE_PIC = "assets/profile.png";
+  const PROFILE_PIC = "YOUR_PROFILE_PICTURE_URL_HERE";
 
   let currentUser = null;
 
@@ -803,11 +807,11 @@ const firebaseConfig = {
   }
 
   function openLoginModal() {
-    document.getElementById("loginModal").classList.add("show");
+    document.getElementById("loginModal")?.classList.add("show");
   }
 
   function closeLoginModal() {
-    document.getElementById("loginModal").classList.remove("show");
+    document.getElementById("loginModal")?.classList.remove("show");
   }
 
   function renderSkills() {
@@ -874,11 +878,16 @@ const firebaseConfig = {
           return;
         }
 
-        const postId = button.dataset.postId;
-        const likeRef = doc(db, "postLikes", postId);
+        try {
+          const postId = button.dataset.postId;
+          const likeRef = doc(db, "postLikes", postId);
 
-        await setDoc(likeRef, { likes: increment(1) }, { merge: true });
-        button.classList.add("liked");
+          await setDoc(likeRef, { likes: increment(1) }, { merge: true });
+          button.classList.add("liked");
+        } catch (error) {
+          console.error("Like failed:", error);
+          alert(`Like failed: ${error.code || error.message}`);
+        }
       });
     });
   }
@@ -917,13 +926,17 @@ const firebaseConfig = {
   const statsRef = doc(db, "siteStats", "main");
 
   async function updateViews() {
-    await setDoc(statsRef, { views: increment(1) }, { merge: true });
+    try {
+      await setDoc(statsRef, { views: increment(1) }, { merge: true });
 
-    onSnapshot(statsRef, snapshot => {
-      const data = snapshot.data();
-      const viewCount = document.getElementById("viewCount");
-      if (viewCount) viewCount.textContent = (data?.views || 0).toLocaleString();
-    });
+      onSnapshot(statsRef, snapshot => {
+        const data = snapshot.data();
+        const viewCount = document.getElementById("viewCount");
+        if (viewCount) viewCount.textContent = (data?.views || 0).toLocaleString();
+      });
+    } catch (error) {
+      console.error("View counter failed:", error);
+    }
   }
 
   updateViews();
@@ -934,7 +947,7 @@ const firebaseConfig = {
       document.querySelectorAll(".section").forEach(item => item.classList.remove("active"));
 
       tab.classList.add("active");
-      document.getElementById(tab.dataset.tab).classList.add("active");
+      document.getElementById(tab.dataset.tab)?.classList.add("active");
     });
   });
 
@@ -949,20 +962,32 @@ const firebaseConfig = {
       return;
     }
 
-    await addDoc(collection(db, "comments"), {
-      text,
-      name: currentUser.displayName,
-      photo: currentUser.photoURL,
-      uid: currentUser.uid,
-      createdAt: serverTimestamp()
-    });
+    try {
+      await addDoc(collection(db, "comments"), {
+        text,
+        name: currentUser.displayName,
+        photo: currentUser.photoURL,
+        uid: currentUser.uid,
+        createdAt: serverTimestamp()
+      });
 
-    input.value = "";
+      input.value = "";
+    } catch (error) {
+      console.error("Comment failed:", error);
+      alert(`Comment failed: ${error.code || error.message}`);
+    }
   });
 
   document.getElementById("googleLogin")?.addEventListener("click", async () => {
-    await signInWithPopup(auth, provider);
-    closeLoginModal();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      currentUser = result.user;
+      closeLoginModal();
+      alert(`Logged in as ${currentUser.displayName}`);
+    } catch (error) {
+      console.error("Google login failed:", error);
+      alert(`Google login failed: ${error.code || error.message}`);
+    }
   });
 
   document.getElementById("closeModal")?.addEventListener("click", closeLoginModal);
@@ -983,6 +1008,16 @@ const firebaseConfig = {
     });
 
     renderComments(comments);
+  }, error => {
+    console.error("Comments loading failed:", error);
+    const commentsList = document.getElementById("commentsList");
+    if (commentsList) {
+      commentsList.innerHTML = `
+        <div class="block">
+          <p style="color:var(--muted);margin:0;">Comments could not load: ${error.code || error.message}</p>
+        </div>
+      `;
+    }
   });
 
   renderSkills();
